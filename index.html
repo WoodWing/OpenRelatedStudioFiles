@@ -1,0 +1,161 @@
+<html>
+<head>
+	<script src="https://unpkg.com/@woodwing/assets-client-sdk"></script>
+
+	<script language="JavaScript">
+        var contextService;
+        var context;
+
+        /**
+         * Set the info message
+         */     
+        function setMessage (message) {
+            document.getElementById("message").innerHTML = message;
+        }
+
+        /**
+         * Returns the URL of the studio server as configured in the plugin properties
+         */ 
+        function getStudioServerURL () {
+            return context.plugin.configProperties.studioServerURL.value + "?protocol=JSON&method=QueryObjects&ww-app=Content+Station";
+        }
+
+        /**
+         * Returns the URL of the studio client as configured in the plugin properties
+         */ 
+        function getStudioClientURL () {
+            var studioClientURL = context.plugin.configProperties.studioClientURL.value;
+            if (studioClientURL.charAt(studioClientURL.length-1) != "/") {
+                studioClientURL += "/";
+            }
+            studioClientURL += "#/ids/IDs=";
+
+            return studioClientURL;
+        }
+
+        /**
+         * Start searching and open the Studio Client
+         */ 
+        async function onLoad() {
+            (async () => {
+                contextService = await window.AssetsClientSdk.AssetsPluginContext.get();  
+                context = contextService.context;
+
+                //Search in Assets for all the variants of the selected images 
+                var query = "";
+                context.activeTab.assetSelection.forEach(function (asset) {
+                    if (query != "") {
+                        query += " OR ";
+                    }
+                    query += "id:" + asset.id + " OR masterId:" +  asset.id; 
+                });    
+                var searchResults = await contextService.fetch('/services/search', {
+                    method: 'POST', 
+                    body: {
+                        q: query,
+                        sort: 'filename'
+                    }
+                });
+
+                var studioQuery = {
+                    "method":"QueryObjects",
+                    "params":[
+                        {
+                            "Params":[
+                            ],
+                            "RequestProps": ["ID","Name","Type"],
+                            "MaxEntries":0,
+                            "Ticket":null
+                        }]
+                        ,"id":0,
+                        "jsonrpc":"2.0"
+                };
+                
+                var studioIds = [];
+                searchResults.hits.forEach(function (asset) {
+                    if (asset.metadata.sceId) {
+                        studioQuery.params[0].Params.push (
+                            {
+                                "Property":"ChildId",
+                                "Operation":"=",
+                                "Value":asset.metadata.sceId,
+                                "__classname__":"QueryParam"
+                            }
+                        );
+                        studioIds.push (asset.metadata.sceId);
+                    }
+                });    
+
+                //Search in Studio for all the related files     
+                if (studioQuery.params[0].Params.length > 0) {           
+                    fetch(getStudioServerURL(), {
+                        mode: 'cors',
+                        credentials: 'include', // include cookie with Studio server ticket!
+                        method: 'POST',
+                        body: JSON.stringify(studioQuery)
+                    }).then(function(response) {
+                        return response.json();
+                    }).then(function(data) {
+                        if (data.error) {
+                            if (data.error.data.detail == "SCEntError_InvalidTicket") {
+                                setMessage ("Please login to <a href='" + getStudioClientURL ()  + "' target='_blank'>Studio</a> first");    
+                            } else {
+                                setMessage (data.error.message);
+                            }                           
+                        } else if (data.result.TotalEntries > 0) {                            
+                            data.result.Rows.forEach(function (row) {
+                                studioIds.push (row[0]);
+                            }); 
+
+                            //Open the studio client
+                            window.open(getStudioClientURL () + studioIds.join("."));
+                            contextService.close(); 
+                        } else {
+                            setMessage ("No related files could be found");
+                        }
+                    });
+                } else {
+                    setMessage ("No related files could be found");
+                }
+            })();
+        }
+        window.onload = onLoad;        
+	</script>
+
+	<style type="text/css">
+		@import url('https://fonts.googleapis.com/css?family=Lato:300,400,700');
+		* {
+			box-sizing: border-box;
+			-webkit-font-smoothing: antialiased;
+			font-size: 14px;
+			font-weight: 400;
+		}
+
+		html,
+		body {
+			font-family: Lato, sans-serif;
+			width: 100%;
+			height: 100%;
+			margin: 0px;
+			color: #777;
+		}
+
+        .infoPanel {
+            margin-top: 35px;
+            margin-left: 20px;
+            font-size: 12px
+        }
+
+
+	</style>
+</head>
+
+<body>
+
+	<div class="infoPanel" >
+        <p id="message">Searching for related files, one moment....</p>
+	</div>
+
+</body>
+
+</html>
