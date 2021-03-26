@@ -3,6 +3,9 @@ The Assets action plugin will open all related files of an image in currently in
 Notes
 - The plugin requires the user to be logged in Studio
 
+![Plugin in action](https://github.com/WoodWing/OpenRelatedStudioFiles/blob/master/dOpenRelatedStudioFiles.gif "Open related files in action")
+
+
 Configuration
 - Install the plugin in a folder on the Studio server
 - Add the plugin as an external action plugin in the Assets Server
