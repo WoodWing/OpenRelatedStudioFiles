@@ -92,6 +92,7 @@
                         mode: 'cors',
                         credentials: 'include', // include cookie with Studio server ticket!
                         method: 'POST',
+			headers: {'X-WoodWing-Application': 'Content Station'},    
                         body: JSON.stringify(studioQuery)
                     }).then(function(response) {
                         return response.json();
